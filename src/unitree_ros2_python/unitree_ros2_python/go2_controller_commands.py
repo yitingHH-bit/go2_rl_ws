@@ -6,7 +6,6 @@ from unitree_go.msg import WirelessController
 from rclpy.duration import Duration
 from std_msgs.msg import Float32MultiArray
 
-
 class WirelessControl(Node):
     def __init__(self):
         super().__init__('wireless_control')

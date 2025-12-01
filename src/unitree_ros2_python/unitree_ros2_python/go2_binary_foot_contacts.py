@@ -31,7 +31,7 @@ class BinaryFootContactsNode(Node):
             msg.foot_force[3],
             msg.foot_force[2]
         ])
-
+        
         # Create binary contacts - needs to be edited
         for index, force in enumerate(self.foot_forces):
             self.binary_foot_contacts[index] = float(force > 40.0)

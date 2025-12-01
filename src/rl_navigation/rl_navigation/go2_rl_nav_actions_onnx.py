@@ -22,11 +22,11 @@ class Go2_RL_Nav_Actions(Node):
             SportModeState,
             'sportmodestate',
             self.state_callback,
-            10)
+            10) 
         self.create_subscription(
-            Float32MultiArray,
-            'projected_gravity',
-            self.projected_gravity_callback,
+            Float32MultiArray,  
+            'projected_gravity',    
+            self.projected_gravity_callback,    
             10)
         self.create_subscription(
             Float32MultiArray,
@@ -34,7 +34,7 @@ class Go2_RL_Nav_Actions(Node):
             self.cmd_pose_callback,
             10)
 
-        # Initializing variables
+        # Initializing variables    
         self.nav_actions = None
         self.processed_actions = None
         self.base_vel = np.array([0.0, 0.0, 0.0], dtype=np.float32)
@@ -54,12 +54,12 @@ class Go2_RL_Nav_Actions(Node):
         # Create a timer to generate actions every 20 milliseconds (50 Hz)
         self.timer_period = 0.02  # 20 milliseconds
         self.timer = self.create_timer(
-            self.timer_period,
+            self.timer_period,  
             self.generate_actions)
 
     def load_onnx_model(self, model_path):
         self.ort_session = ort.InferenceSession(model_path)
-
+    
     def state_callback(self, msg):
         # If first run, set the initial pose to be the current position reading with heading zero
         if not hasattr(self, 'initial_xyz') or not hasattr(self, 'initial_heading'):
@@ -72,7 +72,7 @@ class Go2_RL_Nav_Actions(Node):
         self.current_heading = np.array([msg.imu_state.rpy[2]], dtype=np.float32)
         self.current_pose = np.concatenate((self.current_xyz, self.current_heading)) - self.initial_pose
 
-        # Base velocity observation
+        # Base velocity observation         
         self.base_vel = np.array(msg.velocity, dtype=np.float32)
 
     def projected_gravity_callback(self, msg):

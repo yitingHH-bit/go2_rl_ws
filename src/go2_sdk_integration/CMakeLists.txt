@@ -29,7 +29,7 @@ add_executable(go2_motion_switcher_service src/go2_motion_switcher_service.cpp s
 add_executable(go2_motion_shut_off src/go2_motion_shut_off.cpp)
 add_executable(go2_audio_shut_off src/go2_audio_shut_off.cpp)
 
-# Find ROS dependencies
+# Find ROS dependencies 
 find_package(ament_cmake REQUIRED)
 find_package(unitree_api REQUIRED)
 find_package(unitree_go REQUIRED)

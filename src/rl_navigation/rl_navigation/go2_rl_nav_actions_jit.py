@@ -8,7 +8,6 @@ import torch
 import os
 from ament_index_python.packages import get_package_share_directory
 
-
 class Go2_RL_Nav_Actions(Node):
     def __init__(self):
         super().__init__("nav_action_publisher")

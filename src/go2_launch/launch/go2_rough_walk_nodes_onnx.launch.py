@@ -4,9 +4,9 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     # Shared parameters
-    shared_params = {'network_interface': "enp114s0"}  # TODO: CHANGE TO YOUR INTERFACE NAME
+    shared_params = {'network_interface': "enp3s0"}  # TODO: CHANGE TO YOUR INTERFACE NAME
 
-    return LaunchDescription([
+    return LaunchDescription([  
         # Nodes to be launched
         Node(
             package='go2_sdk_integration',

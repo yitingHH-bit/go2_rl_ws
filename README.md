@@ -1,3 +1,19 @@
+# pointcloud -> PointCloudToScanNode_580
+ament_auto_add_library(pointcloud_to_scan_580 SHARED
+  src/pointcloud_to_scan_node_580.cpp)
+rclcpp_components_register_node(pointcloud_to_scan_580
+  PLUGIN "pointcloud_to_laserscan::PointCloudToScanNode_580"
+  EXECUTABLE PointCloudToScanNode_580)
+
+
+   'go2_infer_local = go2_agent.go2_infer_local:main',
+   'go2_infer_local_Hz = go2_agent.go2_infer_local_Hz:main',
+     
+
+   'go2_infer_local_1 = go2_agent.go2_infer_local:main',
+   'go2_infer_local_Hz_1 = go2_agent.go2_infer_local_Hz:main',
+     
+
 # RL Control and Navigation Deployment - Unitree Go2
 
 ## Introduction and Scope

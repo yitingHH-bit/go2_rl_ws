@@ -102,7 +102,7 @@ class Go2_RL_Actions(Node):
     def cmd_vel_callback(self, msg):
         # Converting twist message to array for concatenation
         self.cmd_vel = np.array([msg.linear.x, msg.linear.y, msg.angular.z], dtype=np.float32)
-
+    
     def joint_pos_vel_callback(self, msg):
         self.joint_pos_vel = np.array(msg.data, dtype=np.float32)
         # The first 12 elements are joint positions

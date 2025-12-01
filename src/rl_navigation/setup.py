@@ -26,7 +26,18 @@ setup(
         'console_scripts': [
             'go2_pose_command = rl_navigation.go2_pose_command:main',
             'go2_rl_nav_actions_onnx = rl_navigation.go2_rl_nav_actions_onnx:main',
-            'go2_rl_nav_actions_jit = rl_navigation.go2_rl_nav_actions_jit:main'
+            'go2_rl_nav_actions_rough_onnx = rl_navigation.go2_rl_nav_actions_onnx_real_rough:main',
+            'go2_rl_flat_actions_onnx = rl_navigation.go2_rl_nav_actions_onnx_real_flat:main',
+            
+            'real_nav_rough_onnx = rl_navigation.go2_rl_nav_actions_onnx_real_nav:main',
+            'go2_rl_nav_actions_jit = rl_navigation.go2_rl_nav_actions_jit:main',
+        
+            'go2_rl_nav_actions_rough_onnx_9000 = rl_navigation.go2_rl_nav_actions_onnx_real_rough_9000:main',
+            'go2_infer_local = rl_navigation.go2_infer_local:main',
+            'go2_infer_local_Hz = rl_navigation.go2_infer_local_Hz:main',
+            'go2_infer_local_Hz_walker = rl_navigation.go2_infer_local_Hz_walker:main',
+            'go2_infer_local_1 = rl_navigation.go2_infer_local_1:main',
+            'go2_infer_local_Hz_1 = rl_navigation.go2_infer_local_Hz_1:main'
         ],
     },
 )

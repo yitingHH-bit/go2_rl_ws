@@ -12,10 +12,11 @@
 
 using std::placeholders::_1;
 
-class Go2_Nav_Deploy_Node : public rclcpp::Node
+class Go2_Nav_Deploy_Node : public rclcpp::Node     
 {
+    
 public:
-    Go2_Nav_Deploy_Node() : Node("go2_nav_deploy")
+    Go2_Nav_Deploy_Node() : Node("go2_nav_deploy")  
     {
         // Publisher for sending commands to the robot
         command_publisher_ = this->create_publisher<unitree_api::msg::Request>("/api/sport/request", 10);
@@ -59,5 +60,5 @@ int main(int argc, char **argv)
     auto node = std::make_shared<Go2_Nav_Deploy_Node>();
     rclcpp::spin(node);
     rclcpp::shutdown();
-    return 0;
+    return 0;   
 }

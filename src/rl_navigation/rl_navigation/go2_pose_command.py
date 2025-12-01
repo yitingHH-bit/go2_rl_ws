@@ -36,7 +36,6 @@ class PoseCommand(Node):
         msg = Float32MultiArray(data=self.cmd_pose)
         self.pose_publisher.publish(msg)
 
-
 def main(args=None):
     rclpy.init(args=args)
     node = PoseCommand()

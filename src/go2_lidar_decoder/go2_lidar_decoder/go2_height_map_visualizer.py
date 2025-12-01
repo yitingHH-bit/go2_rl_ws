@@ -48,7 +48,6 @@ class HeightMapSubscriber(Node):
         plt.title('Height Map')
         plt.show()
 
-
 def main(args=None):
     rclpy.init(args=args)
     height_map_subscriber = HeightMapSubscriber()

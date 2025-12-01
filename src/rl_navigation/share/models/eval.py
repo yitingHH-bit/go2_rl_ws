@@ -1,0 +1,281 @@
+import argparse
+import math
+import os
+import random
+import sys
+import numpy as np
+from datetime import datetime
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+# FILE_PATH = str(Path(__file__).resolve().parent.parent.parent)
+
+import gymnasium as gym
+from isaaclab.app import AppLauncher
+
+# add argparse arguments
+parser = argparse.ArgumentParser("Welcome to Isaac Lab: Omniverse Robotics Environments!")
+parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
+parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
+parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
+parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+parser.add_argument("--task", type=str, default="AliengoLeggedEnv-v0", help="Name of the task.")
+# parser.add_argument("--task", type=str, default="AAURoverEnv-v0", help="Name of the task.")
+parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
+parser.add_argument("--agent", type=str, default="PPO", help="Name of the agent.")
+parser.add_argument("--checkpoint", type=str, default=None, help="Path to model checkpoint to resume training.")
+
+AppLauncher.add_app_launcher_args(parser)
+args_cli, hydra_args = parser.parse_known_args()
+
+# always enable cameras to record video
+if args_cli.video:
+    args_cli.enable_cameras = True
+
+# clear out sys.argv for Hydra
+sys.argv = [sys.argv[0]] + hydra_args
+
+# app_launcher = AppLauncher(launcher_args=args_cli, experience=app_experience)
+
+app_launcher = AppLauncher(args_cli)
+
+import carb
+from isaaclab_rl.skrl import SkrlVecEnvWrapper  # noqa: E402
+
+simulation_app = app_launcher.app
+
+carb_settings = carb.settings.get_settings()
+carb_settings.set_bool(
+    "rtx/raytracing/cached/enabled",
+    False,
+)
+carb_settings.set_int(
+    "rtx/descriptorSets",
+    8192,
+)
+from isaaclab.envs import ManagerBasedRLEnv  # noqa: E402
+from isaaclab.utils.dict import print_dict  # noqa: E402
+from isaaclab.utils.io import dump_pickle, dump_yaml  # noqa: E402
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, export_policy_as_jit, export_policy_as_onnx
+
+
+def video_record(
+        env: ManagerBasedRLEnv, log_dir: str, video: bool, video_length: int, video_interval: int
+) -> ManagerBasedRLEnv:
+    """
+    Function to check and setup video recording.
+
+    Note:
+        Copied from the ORBIT framework.
+
+    Args:
+        env (ManagerBasedRLEnv): The environment.
+        log_dir (str): The log directory.
+        video (bool): Whether or not to record videos.
+        video_length (int): The length of the video (in steps).
+        video_interval (int): The interval between video recordings (in steps).
+
+    Returns:
+        ManagerBasedRLEnv: The environment.
+    """
+
+    if video:
+        video_kwargs = {
+            "video_folder": os.path.join(log_dir, "videos"),
+            "step_trigger": lambda step: step % video_interval == 0,
+            "video_length": video_length,
+        }
+        print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
+        return gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    return env
+
+
+def log_setup(experiment_cfg, env_cfg, agent):
+    """
+    Setup the logging for the experiment.
+
+    Note:
+        Copied from the ORBIT framework.
+    """
+    # specify directory for logging experiments
+    log_root_path = os.path.join(
+        "logs", "skrl", experiment_cfg["agent"]["experiment"]["directory"])
+    log_root_path = os.path.abspath(log_root_path)
+    print(f"[INFO] Logging experiment in directory: {log_root_path}")
+
+    # specify directory for logging runs
+    log_dir = datetime.now().strftime("%b%d_%H-%M-%S")
+    if experiment_cfg["agent"]["experiment"]["experiment_name"]:
+        log_dir = f'_{experiment_cfg["agent"]["experiment"]["experiment_name"]}'
+
+    log_dir += f"_{agent}"
+
+    # set directory into agent config
+    experiment_cfg["agent"]["experiment"]["directory"] = log_root_path
+    experiment_cfg["agent"]["experiment"]["experiment_name"] = log_dir
+
+    # update log_dir
+    log_dir = os.path.join(log_root_path, log_dir)
+
+    # dump the configuration into log-directory
+    dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
+    dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), experiment_cfg)
+    dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
+    dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), experiment_cfg)
+    return log_dir
+
+
+from isaaclab_tasks.utils import parse_env_cfg  # noqa: E402
+from skrl.trainers.torch import SequentialTrainer  # noqa: E402
+from skrl.utils import set_seed  # noqa: E402, F401
+
+import training.envs.navigation.robots  # noqa: E402, F401
+# Import agents
+from training.envs.navigation.learning.skrl import get_agent  # noqa: E402
+from training.scripts.config import parse_skrl_cfg  # noqa: E402
+
+# from simulation.agent.agent_sensors import create_view_camera
+
+def main():
+    args_cli_seed = args_cli.seed if args_cli.seed is not None else random.randint(0, 100000000)
+    env_cfg = parse_env_cfg(args_cli.task, device="cuda:0" if not args_cli.cpu else "cpu", num_envs=args_cli.num_envs)
+    experiment_cfg = parse_skrl_cfg(args_cli.task + f"_{args_cli.agent}")
+
+    log_dir = log_setup(experiment_cfg, env_cfg, args_cli.agent)
+
+    # Create the environment
+    render_mode = "rgb_array" if args_cli.video else None
+    env = gym.make(args_cli.task, cfg=env_cfg, viewport=args_cli.video, render_mode=render_mode)
+    # Check if video recording is enabled
+    env = video_record(env, log_dir, args_cli.video, args_cli.video_length, args_cli.video_interval)
+    # Wrap the environment
+    env = SkrlVecEnvWrapper(env, ml_framework="torch")
+    set_seed(args_cli_seed if args_cli_seed is not None else experiment_cfg["seed"])
+
+    # Get the observation and action spaces
+    num_obs = env.observation_manager.group_obs_dim["policy"][0]
+    print("group_obs_dim:", env.observation_manager.group_obs_dim)
+    num_actions = env.action_manager.action_term_dim[0]
+    # num_actions = 2   
+    # num_obs = env.unwrapped.observation_manager.group_obs_dim["policy"][0]  # + num_actions
+    observation_space = gym.spaces.Box(low=-math.inf, high=math.inf, shape=(num_obs,))
+    low = np.array([-2.0, -2.0, -0.5], dtype=np.float32)
+    high = np.array([2.0, 2.0, 0.5], dtype=np.float32)
+    action_space = gym.spaces.Box(low=low, high=high, shape=(num_actions,))
+    # action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(num_actions,))
+    print(f'Observation space: {observation_space.shape}')
+    print(f'Action space: {action_space.shape}')
+    print(f'num envs: {env.num_envs}')
+    print(f'env obs space: {env.observation_space}')
+    print(f'env action space: {env.action_space}')
+
+    trainer_cfg = experiment_cfg["trainer"]
+    trainer_cfg["timesteps"] = 1000000
+
+    agent = get_agent(args_cli.agent, env, observation_space, action_space, experiment_cfg, conv=True)
+    # create_view_camera([38, 33, 2], [90, 0, 0])
+
+    # Get the checkpoint path from the experiment configuration
+    print(f'args_cli.task: {args_cli.task}')
+    agent_policy_path = gym.spec(args_cli.task).kwargs.pop("best_model_path")
+
+    agent.load(agent_policy_path)
+    trainer_cfg = experiment_cfg["trainer"]
+    print(trainer_cfg)
+    
+ 
+    import os
+    import torch
+
+    # 两个 group 的维度
+    obs_dim_policy = 906  # 900 heightmap + 6 MLP
+    obs_dim_low    = 6
+
+    # 动作范围
+    low  = torch.tensor([-1.0, -1.0, -0.5], dtype=torch.float32)
+    high = torch.tensor([ 1.0,  1.0,  0.5], dtype=torch.float32)
+
+    # 从 agent 里拿策略网络
+    policy_net = agent.policy  # GaussianNeuralNetworkConv
+    device = next(policy_net.parameters()).device
+    policy_net.eval()
+
+    class DeterministicWrapper(torch.nn.Module):
+        def __init__(self, policy, low, high):
+            super().__init__()
+            self.policy = policy
+            self.register_buffer("low",  low.clone().detach())
+            self.register_buffer("high", high.clone().detach())
+
+        def forward(self, obs_policy, obs_low_level):
+            """
+            obs_policy: (batch, 906) -> 前900: heightmap, 后6: MLP输入
+            obs_low_level: (batch, 6)  -> 不送进 CNN
+            """
+            # 原样把 obs_policy 送入 policy（内部会自己拆 heightmap & MLP）
+            inputs = {"states": obs_policy}
+
+            # 执行推理
+            mean_actions, _, _ = self.policy.compute(inputs, role="policy")
+
+            # 如果你要在导出策略里用 low_level 做额外处理，可以在这里加逻辑
+            # 当前版本是直接忽略 low_level，只导出主策略
+            return torch.clamp(mean_actions, self.low, self.high)
+
+    # 创建 wrapper
+    wrapper = DeterministicWrapper(policy_net, low, high).to(device)
+    wrapper.eval()
+
+    # Dummy 输入（两个 group）
+    dummy_obs_policy = torch.zeros(1, obs_dim_policy, device=device)
+    dummy_obs_low    = torch.zeros(1, obs_dim_low, device=device)
+
+    # 导出目录
+    export_dir = os.path.join(os.path.dirname(agent_policy_path), "exported")
+    os.makedirs(export_dir, exist_ok=True)
+    print(f"[INFO] Exporting to {export_dir}")
+
+    # TorchScript 导出
+    ts_path = os.path.join(export_dir, "policy.pt")
+    print(f"[INFO] Tracing TorchScript → {ts_path}")
+    scripted = torch.jit.trace(wrapper, (dummy_obs_policy, dummy_obs_low), check_trace=False)
+    scripted.save(ts_path)
+
+    # ONNX 导出
+    onnx_path = os.path.join(export_dir, "policy.onnx")
+    print(f"[INFO] Exporting ONNX → {onnx_path}")
+    torch.onnx.export(
+        wrapper,
+        (dummy_obs_policy, dummy_obs_low),
+        onnx_path,
+        export_params=True,
+        opset_version=11,
+        do_constant_folding=True,
+        input_names=['obs_policy', 'obs_low_level'],
+        output_names=['actions'],
+        dynamic_axes={
+            'obs_policy': {0: 'batch_size'},
+            'obs_low_level': {0: 'batch_size'},
+            'actions': {0: 'batch_size'}
+        }
+    )
+
+    print("[INFO] Export finished.")
+
+
+
+
+
+
+
+
+    trainer = SequentialTrainer(cfg=trainer_cfg, agents=agent, env=env)
+    trainer.eval()
+
+    env.close()
+    simulation_app.close()
+
+
+if __name__ == "__main__":
+    main()
